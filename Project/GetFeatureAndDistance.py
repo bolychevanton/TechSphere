@@ -16,12 +16,13 @@
     
     Функция getFeatureMFCC извлекает фичи и записывает их в вектор
     Функция Distance_KL(song_p, song_q) считает расстояние в соответствии со статьей
-    """
+"""
 
 import librosa
 import numpy as np
 from numpy.linalg import det
 from numpy.linalg import inv
+
 import math
 
 def getFeatureMFCC(song):
@@ -36,9 +37,13 @@ def getFeatureMFCC(song):
     appended_dim_and_means = np.append(MFCC.shape[1], means)
     return np.append(appended_dim_and_means, cov_martix.ravel())
 
-def Divergence_KL(song_p, song_q)
-if song_p[0] != song_q[0]:
-    raise
+def QuadraticForm(A, x, y):
+    # скопировал из stackoverflow
+    return ((np.matrix(x).T * np.matrix(A)).A * y.T.A).sum(1)
+
+def Divergence_KL(song_p, song_q):
+    if song_p[0] != song_q[0]:
+        raise
     
     # Берем фичи
     N = song_p[0]
@@ -46,7 +51,7 @@ if song_p[0] != song_q[0]:
     cov_p = song_p[N + 1 :].reshape(N,N)
     means_q = song_q[1 : N + 1]
     cov_q = song_q[N + 1 :].reshape(N,N)
-    
+
     inv_cov_q = inv(cov_q)
     means_diff = means_p - means_q
     return 0.5 * (math.log(det(cov_q) / det(cov_p)) +\
