@@ -22,42 +22,61 @@ import librosa
 import numpy as np
 from numpy.linalg import det
 from numpy.linalg import inv
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 import math
 
 def getFeatureMFCC(song):
     # MFCC c обрезанными верхними порогами
-    MFCC = librosa.feature.mfcc(song)[:15]
+    MFCC = librosa.feature.mfcc(song)[:15, 1:]
     
     # средние и матрица ковариаций
-    means = np.mean(MFCC, axis = 0)
-    cov_martix = np.cov(MFCC, rowvar = False)
-    
-    # возвращаем вектор фич
-    appended_dim_and_means = np.append(MFCC.shape[1], means)
-    return np.append(appended_dim_and_means, cov_martix.ravel())
+    means = np.mean(MFCC, axis = 1)
+    cov_matrix = np.cov(MFCC, rowvar = True)    
+
+    return np.append(means, cov_matrix.ravel())
 
 def QuadraticForm(A, x, y):
     # скопировал из stackoverflow
-    return ((np.matrix(x).T * np.matrix(A)).A * y.T.A).sum(1)
+    return np.dot(np.dot(A, x), y)
 
-def Divergence_KL(song_p, song_q):
-    if song_p[0] != song_q[0]:
-        raise
-    
+def Divergence_KL(song_p, song_q):    
     # Берем фичи
-    N = song_p[0]
-    means_p = song_p[1 : N + 1]
-    cov_p = song_p[N + 1 :].reshape(N,N)
-    means_q = song_q[1 : N + 1]
-    cov_q = song_q[N + 1 :].reshape(N,N)
+    means_p = song_p[0 : 15]
+    cov_p = song_p[15 :].reshape(15, 15)
+    means_q = song_q[0 : 15]
+    cov_q = song_q[15 :].reshape(15, 15)
 
     inv_cov_q = inv(cov_q)
     means_diff = means_p - means_q
     return 0.5 * (math.log(det(cov_q) / det(cov_p)) +\
                   np.trace(np.dot(inv_cov_q, cov_p)) +\
-                  QuadraticForm(inv_cov_q, means_diff, means_diff) - N)
-
+                  QuadraticForm(inv_cov_q, means_diff, means_diff) - 15)
+                  
 
 def Distance_KL(song_p, song_q):
     return Divergence_KL(song_p, song_q) + Divergence_KL(song_q, song_p)
+
+def getData(where_to, genre, range_tuple):
+    for i in range(range_tuple):
+        if i < 10:
+            path = "./" + genre + "/" + genre + ".0000" + str(i) + ".au"        
+        else:
+            path = "./" + genre + "/" + genre + ".000" + str(i) + ".au"
+
+        song = librosa.load(path)[0]
+        where_to.append(getFeatureMFCC(song))
+        
+data = list()
+getData(data, "hiphop", 30)
+getData(data, "rock", 30)
+getData(data, "classical", 30)
+data = np.array(data)
+y = np.append([np.zeros(30), 1 + np.zeros(30)], 2 +  np.zeros(30))
+
+X_train, X_test, y_train, y_test = train_test_split(data, y, test_size=0.3, random_state=0)
+knn = KNeighborsClassifier(n_neighbors = 5, metric=Divergence_KL)
+knn.fit(X_train, y_train)
+accuracy_score(knn.predict(X_test), y_test)
